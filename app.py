@@ -1,27 +1,56 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import json
+from flask_cors import CORS
+from bson import ObjectId
 
-import prediction
-
+import hybrid_recommendation
 
 app = Flask(__name__)
+CORS(app)
 client = MongoClient('localhost', 27017)
 
 db = client.bookgram_db
 authentication = db.authentication
 locations = db.locations
+books = db.books
 
 
 @app.route('/')
-def hello_world():  # put application's code here
+def hello_world():
     return 'Hello World!'
 
 
-@app.route('/predict', methods=['POST'])
-def predict_genre():
-    input_text = request.json['description']
-    data = prediction.get_genre(input_text)
+@app.route('/rec', methods=['POST'])
+def recommend_books():
+    global recommendations
+    description = request.json['description']
+    location = request.json['location']
+
+    print(description)
+    print(location)
+
+    # Call the get_lstm_prediction function to get the top 10 books with the predicted genre
+    top10_books = hybrid_recommendation.get_lstm_prediction(description)
+
+    # Call the hybrid_recommendation function to get the final recommended books
+    # recommended = hybrid_recommendation.hybrid_recommendation(top10_books, 0, location)
+
+    # data = {"recommendations": recommendations.to_dict(orient='records')}
+    recommendations_json = top10_books.to_json(orient='records', date_format='iso', date_unit='s',
+                                                   default_handler=str)
+    # data = {"recommendations": json.loads(recommendations_json)}
+    recommendations = recommendations_json
+    # print(recommendations)
+
+    # Convert the recommendations dataframe to a JSON object and return it
+    return jsonify(1)
+
+
+@app.route('/rec1', methods=['GET'])
+def get_recommendations():
+    print(recommendations)
+    data = {"recommendations": json.loads(recommendations)}
     return jsonify(data)
 
 
@@ -85,6 +114,37 @@ def add_location():
     result = locations.insert_one(location)
 
     return {'message': 'Location saved successfully'}, 200
+
+
+@app.route('/add_book', methods=['POST'])
+def add_book():
+
+    data = json.loads(request.data)
+    bookName = data['bookName']
+    author = data['author']
+    description = data['description']
+    isbn = data['isbn']
+
+    # Added new book
+    book = {
+        'bookName': bookName,
+        'author': author,
+        'description': description,
+        'isbn': isbn,
+    }
+    result = books.insert_one(book)
+    return {'message': 'Book registered successfully'}, 200
+
+
+@app.route('/get_books', methods=['GET'])
+def get_books():
+    result = books.find()
+    data = []
+    for document in result:
+        # Convert ObjectId to string for serialization
+        document['_id'] = str(document['_id'])
+        data.append(document)
+    return {'result': data}, 200
 
 
 if __name__ == '__main__':

@@ -38,7 +38,7 @@ def tokenizer(cleaned_text):
 
 def get_genre(description):
 
-    BookModel1 = load_model('models/BookModel1.h5')
+    BookModel1 = load_model('models/best_model.h5')
     max_desc_length = 200
 
     labels = ['fiction', 'nonfiction']
